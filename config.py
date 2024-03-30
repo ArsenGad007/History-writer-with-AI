@@ -1,0 +1,8 @@
+API_TOKEN = '6531602177:AAHriZwt-KLngzQ2-f2Q4glqQXVW49ZU2Ms'
+MAX_TOKENS_IN_TASK = 300
+MAX_TOKENS_IN_ANSWER = 100
+ENDPOINT = 'http://localhost:1234/v1/chat/completions'
+HEADER = {"Content-Type": "application/json"}
+COUNT_SESSION = 3
+TOKENS_IN_SESSION = 400
+TEMPERATURE = 0.7
