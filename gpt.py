@@ -1,6 +1,5 @@
 import requests
-from transformers import AutoTokenizer
-from config import MAX_TOKENS_IN_TASK, MAX_TOKENS_IN_ANSWER, ENDPOINT, HEADER, TEMPERATURE, TOKENS_IN_SESSION
+from config import MAX_TOKENS_IN_TASK, MAX_TOKENS_IN_ANSWER, TEMPERATURE, IAM_TOKEN, FOLDER_ID
 import logging
 
 # Настройка логирования
@@ -21,14 +20,26 @@ def create_new_token():
     return response.json()
 
 
-def count_tokens(text: str):
+def count_tokens(text: str, folder_id: str, iam_token: str):
     """
     Функция считает количество токенов в тексте
+    :param iam_token:
+    :param folder_id:
     :param text:
     :return: Число токенов в тексте
     """
-    tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.1")  # название модели
-    return len(tokenizer.encode(text))
+    headers = {
+        'Authorization': f'Bearer {iam_token}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "modelUri": f"gpt://{folder_id}/yandexgpt-lite",
+        "text": text
+    }
+    response = requests.post("https://llm.api.cloud.yandex.net/foundationModels/v1/tokenize", headers=headers,
+                             json=data)
+    tokenizer = response.json()["tokens"]
+    return len(tokenizer)
 
 
 def answer_gpt(UserMessage: str, UserId: int, UserName: str, db: object.__class__):
@@ -41,7 +52,7 @@ def answer_gpt(UserMessage: str, UserId: int, UserName: str, db: object.__class_
     :return: Ответ от нейросети
     """
 
-    if count_tokens(UserMessage) > MAX_TOKENS_IN_TASK:
+    if count_tokens(UserMessage, FOLDER_ID, IAM_TOKEN) > MAX_TOKENS_IN_TASK:
         logging.error(f"{UserName}: Промт слишком длинный")
         return "Задача слишком длинная :(. Переформулируйте запрос"
 
@@ -53,7 +64,7 @@ def answer_gpt(UserMessage: str, UserId: int, UserName: str, db: object.__class_
         # Записываем данные в таблицу
         db.update_data(UserId, 'task', UserMessage, 'Users')
         db.update_data(UserId, 'answers', " ", 'Users')
-        db.update_data(UserId, 'user_content', f"Hапиши начало истории в жанре "
+        db.update_data(UserId, 'user_content', f"Напиши начало истории в жанре "
                                                f"{db.select_data(UserId, 'genre', 'Users')}, в роли главного "
                                                f"героя: {db.select_data(UserId, 'character', 'Users')}. Также "
                                                f"пользователь просит учесть эту дополнительную информацию: "
@@ -63,9 +74,8 @@ def answer_gpt(UserMessage: str, UserId: int, UserName: str, db: object.__class_
     try:
         logging.info(f"{UserName}: Генерация промта")
         # Отправляем Post запрос
-        iam_token = create_new_token()["access_token"]
-        print(create_new_token()["access_token"])
-        folder_id = "b1gamvjok1q4hag6gjmj"  # Folder_id для доступа к YandexGPT
+        iam_token = IAM_TOKEN
+        folder_id = FOLDER_ID  # Folder_id для доступа к YandexGPT
 
         headers = {
             'Authorization': f'Bearer {iam_token}',
@@ -104,11 +114,10 @@ def answer_gpt(UserMessage: str, UserId: int, UserName: str, db: object.__class_
 
     try:
         # Извлечение ответа GPT
-        db.update_data(UserId, 'gpt_response', response.json()["result"]["alternatives"][0]["message"]["text"])
+        db.update_data(UserId, 'gpt_response', response.json()["result"]["alternatives"][0]["message"]["text"], 'Users')
     except:
         logging.error(f"{UserName}: Не удалось получить ответ от нейросети")
         return "Не удалось получить ответ от нейросети"
-        # print('Текст ошибки:', PostRequest.json())
 
     # Сохраняем ответы GPT и записываем данные в таблицу
     db.update_data(UserId, 'answers', f"{db.select_data(UserId, 'answers', 'Users')} "

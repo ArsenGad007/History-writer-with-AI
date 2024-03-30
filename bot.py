@@ -6,7 +6,7 @@ from telebot.types import ReplyKeyboardMarkup
 # Импортируем функцию gpt для работы с нейросетью
 from gpt import answer_gpt, count_tokens
 from database import DataBase
-from config import API_TOKEN, COUNT_SESSION, TOKENS_IN_SESSION
+from config import API_TOKEN, COUNT_SESSION, TOKENS_IN_SESSION, FOLDER_ID, IAM_TOKEN
 
 import logging
 
@@ -82,7 +82,7 @@ def new_story(message):
 
     if db.select_data(user_id, 'session', 'Users') <= 0:
         return "У вас закончились сессии :("
-    elif count_tokens(db.select_data(user_id, 'answers', 'Users')) > TOKENS_IN_SESSION:
+    elif count_tokens(db.select_data(user_id, 'answers', 'Users'), FOLDER_ID, IAM_TOKEN) > TOKENS_IN_SESSION:
         logging.error(f"{user_name}: Закончились токены на сессию")
         return "У вас закончились токены на сессию. Начните новую сессию /new_session"
 
@@ -308,7 +308,7 @@ def new_session(message):
 def debug_mode(message):
     user_id = message.from_user.id
     db.update_data(user_id, 'debug_mode', 1, 'Users')
-    bot.send_message(message.from_user.id, "debug_mode включен")
+    bot.send_message(message.from_user.id, "Режим отладки включен")
 
 
 # Обработчик текстовых сообщений пользователя
